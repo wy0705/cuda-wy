@@ -508,4 +508,237 @@ int RTREE_QUAL::PickBranch(Rect* a_rect, Node* a_node)
     }
     return best;
 }
+
+//计算矩阵大小
+RTREE_TEMPLATE
+ELEMTYPEREAL RTREE_QUAL::RectSphericalVolume(Rect* a_rect)
+{
+    ELEMTYPEREAL volume;
+
+    volume = (ELEMTYPEREAL)a_rect->m_max[0]-(ELEMTYPEREAL)a_rect->m_min[0];
+    //先算边长
+    for (int index = 1; index < NUMDIMS; ++index) {
+        ELEMTYPEREAL halfExtent = (ELEMTYPEREAL)a_rect->m_max[index]-(ELEMTYPEREAL)a_rect->m_min[index];
+        volume*=halfExtent;
+    }
+
+    return volume;
+}
+
+//使用其中一种方法计算矩形体积
+RTREE_TEMPLATE
+ELEMTYPEREAL RTREE_QUAL::CalcRectVolume(Rect* a_rect)
+{
+    return RectVolume(a_rect);
+}
+
+///方法待定，没想好！
+/* 选择分区的方法
+ 作为两组的点点，选择如果被单个矩形覆盖会浪费最多面积的两个矩形，
+ 即显然是同一组中最差的一对。剩下的，一次选择一个 被放入两组中的一组。
+ 选择的一组是根据哪一组在面积扩展方面具有最大差异的组 - rect 最强烈地被一组吸引而被另一组排斥。
+ 如果一组太满（更多会迫使其他组违反最小填充要求），则另一组得到其余的。
+ 最后这些是最容易进入任一组的。*/
+RTREE_TEMPLATE
+void RTREE_QUAL::ChoosePartition(PartitionVars* a_parVars, int a_minFill)
+{
+    ELEMTYPEREAL biggestDiff;
+    int group,chosen,betterGroup;
+
+    InitParVars(a_parVars,a_parVars->m_branchCount,a_minFill);  //初始化 PartitionVars 结构
+    PickSeeds(a_parVars);
+
+    while (((a_parVars->m_count[0] + a_parVars->m_count[1]) < a_parVars->m_total)
+           && (a_parVars->m_count[0] < (a_parVars->m_total - a_parVars->m_minFill))
+           && (a_parVars->m_count[1] < (a_parVars->m_total - a_parVars->m_minFill)))//保证总量不超过最大值
+    {
+        biggestDiff =(ELEMTYPEREAL)-1;
+        for (int index = 0; index < a_parVars->m_total; ++index) {
+            if (!a_parVars->m_taken[index])
+            {
+                Rect* curRect = &a_parVars->m_branchBuf[index].m_rect;
+                Rect rect0 = CombineRect(curRect, &a_parVars->m_cover[0]);
+                Rect rect1 = CombineRect(curRect, &a_parVars->m_cover[1]);
+                ELEMTYPEREAL growth0 = CalcRectVolume(&rect0) - a_parVars->m_area[0];
+                ELEMTYPEREAL growth1 = CalcRectVolume(&rect1) - a_parVars->m_area[1];
+                ELEMTYPEREAL diff = growth1 - growth0;
+                if(diff >= 0)
+                {
+                    group = 0;
+                }
+                else
+                {
+                    group = 1;
+                    diff = -diff;
+                }
+
+                if(diff > biggestDiff)
+                {
+                    biggestDiff = diff;
+                    chosen = index;
+                    betterGroup = group;
+                }
+                else if((diff == biggestDiff) && (a_parVars->m_count[group] < a_parVars->m_count[betterGroup]))
+                {
+                    chosen = index;
+                    betterGroup = group;
+                }
+            }
+        }
+    }
+}
+
+//根据分区将缓冲区中的分支复制到两个节点中。
+RTREE_TEMPLATE
+void RTREE_QUAL::LoadNodes(Node* a_nodeA, Node* a_nodeB, PartitionVars* a_parVars)
+{
+    for (int index = 0; index < a_parVars->m_total; ++index) {
+        if (a_parVars->m_partition[index] ==0)
+        {
+            AddBranch(&a_parVars->m_branchBuf[index], a_nodeA);
+        }
+        else if (a_parVars->m_partition[index] == 1)
+        {
+            AddBranch(&a_parVars->m_branchBuf[index], a_nodeB);
+        }
+    }
+}
+
+// 初始化 PartitionVars 结构。
+RTREE_TEMPLATE
+void RTREE_QUAL::InitParVars(PartitionVars* a_parVars, int a_maxRects, int a_minFill)
+{
+    a_parVars->m_count[0] = a_parVars->m_count[1] = 0;
+    a_parVars->m_area[0] = a_parVars->m_area[1] = (ELEMTYPEREAL)0;
+    a_parVars->m_total = a_maxRects;
+    a_parVars->m_minFill = a_minFill;
+    for(int index=0; index < a_maxRects; ++index)
+    {
+        a_parVars->m_taken[index] = false;
+        a_parVars->m_partition[index] = -1;
+    }
+}
+
+//把PartitionVars中的元素分成两个点点分组
+RTREE_TEMPLATE
+void RTREE_QUAL::PickSeeds(PartitionVars* a_parVars)
+{
+    int seed0,seed1;
+    ELEMTYPEREAL worst,waste;
+    ELEMTYPEREAL area[MAXNODES+1];
+
+    for (int index = 0; index < a_parVars->m_total; ++index) {
+        area[index]=CalcRectVolume(&a_parVars->m_branchBuf[index].m_rect);
+    }
+
+    worst = -a_parVars->m_coverSplitArea - 1;
+    for(int indexA=0; indexA < a_parVars->m_total-1; ++indexA)
+    {
+        for(int indexB = indexA+1; indexB < a_parVars->m_total; ++indexB)
+        {
+            Rect oneRect = CombineRect(&a_parVars->m_branchBuf[indexA].m_rect, &a_parVars->m_branchBuf[indexB].m_rect);
+            waste = CalcRectVolume(&oneRect) - area[indexA] - area[indexB];
+            if(waste > worst)
+            {
+                worst = waste;
+                seed0 = indexA;
+                seed1 = indexB;
+            }
+        }
+    }
+    Classify(seed0, 0, a_parVars);
+    Classify(seed1, 1, a_parVars);
+}
+//在其中一个组中放置一个分支。
+RTREE_TEMPLATE
+void RTREE_QUAL::Classify(int a_index, int a_group, PartitionVars* a_parVars)
+{
+    a_parVars->m_partition[a_index] = a_group;
+    a_parVars->m_taken[a_index] = true;
+
+    if (a_parVars->m_count[a_group] == 0)
+    {
+        a_parVars->m_cover[a_group] = a_parVars->m_branchBuf[a_index].m_rect;
+    }
+    else
+    {
+        a_parVars->m_cover[a_group] = CombineRect(&a_parVars->m_branchBuf[a_index].m_rect, &a_parVars->m_cover[a_group]);
+    }
+    a_parVars->m_area[a_group] = CalcRectVolume(&a_parVars->m_cover[a_group]);
+    ++a_parVars->m_count[a_group];
+}
+// 为 DeletRect 中使用的列表中的节点分配空间存储发生下溢的节点。
+RTREE_TEMPLATE
+typename RTREE_QUAL::ListNode* RTREE_QUAL::AllocListNode()
+{
+    return new ListNode;
+}
+
+RTREE_TEMPLATE
+void RTREE_QUAL::FreeListNode(ListNode* a_listNode)
+{
+    delete a_listNode;
+}
+
+//确定两个矩形是否重叠。
+RTREE_TEMPLATE
+bool RTREE_QUAL::Overlap(Rect* a_rectA, Rect* a_rectB)
+{
+    for(int index=0; index < NUMDIMS; ++index)
+    {
+        if (a_rectA->m_min[index] > a_rectB->m_max[index] ||
+            a_rectB->m_min[index] > a_rectA->m_max[index])
+        {
+            return false;
+        }
+    }
+    return true;
+}
+//将节点添加到重新插入列表中。其所有分支机构稍后将
+//可以重新插入到索引结构中。
+RTREE_TEMPLATE
+void RTREE_QUAL::ReInsert(Node* a_node, ListNode** a_listNode)
+{
+    ListNode* newListNode;
+
+    newListNode = AllocListNode();
+    newListNode->m_node = a_node;
+    newListNode->m_next = *a_listNode;
+    *a_listNode = newListNode;
+}
+
+RTREE_TEMPLATE
+void RTREE_QUAL::RemoveAllRec(Node* a_node)
+{
+    if(a_node->IsInternalNode()) // This is an internal node in the tree
+    {
+        for(int index=0; index < a_node->m_count; ++index)
+        {
+            RemoveAllRec(a_node->m_branch[index].m_child);
+        }
+    }
+    FreeNode(a_node);
+}
+
+RTREE_TEMPLATE
+void RTREE_QUAL::Reset()
+{
+    RemoveAllRec(m_root);
+}
+
+RTREE_TEMPLATE
+void RTREE_QUAL::CountRec(Node* a_node, int& a_count)
+{
+    if(a_node->IsInternalNode())  // not a leaf node
+    {
+        for(int index = 0; index < a_node->m_count; ++index)
+        {
+            CountRec(a_node->m_branch[index].m_child, a_count);
+        }
+    }
+    else // A leaf node
+    {
+        a_count += a_node->m_count;
+    }
+}
 #endif //WY_CUDA_RTREE_H
