@@ -6,6 +6,8 @@
 
 #ifndef WY_CUDA_LUMP_H
 #define WY_CUDA_LUMP_H
+
+//注意：我们使用block全部用new/delete
 class Module
 {
 private:
@@ -179,6 +181,7 @@ public:
     };
 
 
+    Block* AllocBlock();
     bool AddBlock(Block* block);
     Matrix* insertTable(string Tablename,Nature* natures);    //建表
     int deleteTable(Matrix* location,string Tablename);         //删表
@@ -192,4 +195,21 @@ public:
     int ToMatrix(ListCake* m_listCake,Matrix* m_matrix);//计算位置
 
 };
+
+//实例一个block
+Module::Block* Module::AllocBlock()
+{
+    Block* newBlock;
+    newBlock=new Block;
+    InitBlock(newBlock);
+    return newBlock;
+}
+
+bool Module::InitBlock(Block *m_block)
+{
+    m_block->m_count=0;
+}
+bool Module::AddBlock(Block *block){}
+
+
 #endif //WY_CUDA_LUMP_H
