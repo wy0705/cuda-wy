@@ -4,7 +4,11 @@
 
 #ifndef WY_CUDA_RTREE_H
 #define WY_CUDA_RTREE_H
-
+//DATATYPE 数据类型
+//ELEMTYPE 元素的类型
+//NUMDIMS 维度数2/3
+//TMAXNODES 阶数
+//ELEMTYPEREAL 计算体积用的，你们可以直接当ELEMTYPE，不用管
 class RTFileStream;
 template<class DATATYPE, class ELEMTYPE, int NUMDIMS,
         class ELEMTYPEREAL = ELEMTYPE, int TMAXNODES = 8, int TMINNODES = TMAXNODES / 2>
