@@ -4,7 +4,7 @@ set(CMAKE_DEPENDS_LANGUAGES
   )
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_CXX
-  "/home/wy/CLionProjects/wy-cuda/main.cpp" "/home/wy/CLionProjects/wy-cuda/cmake-build-debug/CMakeFiles/wy_cuda.dir/main.cpp.o"
+  "/projects/cuda-wy/main.cpp" "/projects/cuda-wy/cmake-build-debug/CMakeFiles/wy_cuda.dir/main.cpp.o"
   )
 set(CMAKE_CXX_COMPILER_ID "GNU")
 
