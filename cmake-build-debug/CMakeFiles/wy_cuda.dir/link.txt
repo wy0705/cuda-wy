@@ -1,0 +1,1 @@
+/usr/bin/c++  -g   CMakeFiles/wy_cuda.dir/main.cpp.o  -o wy_cuda 

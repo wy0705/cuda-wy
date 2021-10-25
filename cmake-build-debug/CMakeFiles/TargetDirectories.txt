@@ -1,0 +1,3 @@
+/home/wy/CLionProjects/wy-cuda/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/home/wy/CLionProjects/wy-cuda/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/wy/CLionProjects/wy-cuda/cmake-build-debug/CMakeFiles/wy_cuda.dir
