@@ -41,10 +41,10 @@ public:
     //最大点
     //最小点
     //操作数据id 可能是零，但不允许出现负数
-    void Insert(const ELEMTYPE a_min[NUMDIMS], const ELEMTYPE a_max[NUMDIMS], const DATATYPE& a_dataId);
+    void Insert(const ELEMTYPE a_min[NUMDIMS], const ELEMTYPE a_max[NUMDIMS], const DATATYPE& a_dataId); //刘
 
 
-    void Remove(const ELEMTYPE a_min[NUMDIMS], const ELEMTYPE a_max[NUMDIMS], const DATATYPE& a_dataId);
+    void Remove(const ELEMTYPE a_min[NUMDIMS], const ELEMTYPE a_max[NUMDIMS], const DATATYPE& a_dataId);  //王
 
 
     //return返回找到的条目数
@@ -269,8 +269,8 @@ protected:
     void FreeNode(Node* a_node);
     void InitNode(Node* a_node);
     void InitRect(Rect* a_rect);
-    bool InsertRectRec(Rect* a_rect, const DATATYPE& a_id, Node* a_node, Node** a_newNode, int a_level);     //
-    bool InsertRect(Rect* a_rect, const DATATYPE& a_id, Node** a_root, int a_level);                           //
+    bool InsertRectRec(Rect* a_rect, const DATATYPE& a_id, Node* a_node, Node** a_newNode, int a_level);     //刘
+    bool InsertRect(Rect* a_rect, const DATATYPE& a_id, Node** a_root, int a_level);                           //刘
     Rect NodeCover(Node* a_node);
     bool AddBranch(Branch* a_branch, Node* a_node, Node** a_newNode);
     void DisconnectBranch(Node* a_node, int a_index);
@@ -286,8 +286,8 @@ protected:
     void InitParVars(PartitionVars* a_parVars, int a_maxRects, int a_minFill);
     void PickSeeds(PartitionVars* a_parVars);
     void Classify(int a_index, int a_group, PartitionVars* a_parVars);
-    bool RemoveRect(Rect* a_rect, const DATATYPE& a_id, Node** a_root);                           //
-    bool RemoveRectRec(Rect* a_rect, const DATATYPE& a_id, Node* a_node, ListNode** a_listNode);                 //
+    bool RemoveRect(Rect* a_rect, const DATATYPE& a_id, Node** a_root);                           //王
+    bool RemoveRectRec(Rect* a_rect, const DATATYPE& a_id, Node* a_node, ListNode** a_listNode);                 //王
     ListNode* AllocListNode();
     void FreeListNode(ListNode* a_listNode);
     bool Overlap(Rect* a_rectA, Rect* a_rectB);
