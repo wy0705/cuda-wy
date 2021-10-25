@@ -87,6 +87,9 @@
 		<Unit filename="/home/wy/CLionProjects/wy-cuda/Lump.h">
 			<Option target="wy_cuda"/>
 		</Unit>
+		<Unit filename="/home/wy/CLionProjects/wy-cuda/RTree.h">
+			<Option target="wy_cuda"/>
+		</Unit>
 		<Unit filename="/home/wy/CLionProjects/wy-cuda/main.cpp">
 			<Option target="wy_cuda"/>
 		</Unit>
