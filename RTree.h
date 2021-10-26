@@ -10,6 +10,8 @@
 //TMAXNODES 阶数
 //ELEMTYPEREAL 计算体积用的，你们可以直接当ELEMTYPE，不用管
 
+#include <cstdlib>
+
 //注意：我们使用节点全部用new/delete
 //注意：插入和删除数据需要了解其恒定最小边界矩形。
 class RTFileStream;
@@ -741,4 +743,59 @@ void RTREE_QUAL::CountRec(Node* a_node, int& a_count)
         a_count += a_node->m_count;
     }
 }
+template<class DATATYPE, class ELEMTYPE, int NUMDIMS, class ELEMTYPEREAL, int TMAXNODES, int TMINNODES>
+bool RTree<DATATYPE, ELEMTYPE, NUMDIMS, ELEMTYPEREAL, TMAXNODES, TMINNODES>::InsertRectRec(RTree::Rect *a_rect,
+                                                                                           const DATATYPE &a_id,
+                                                                                           RTree::Node *a_node,
+                                                                                           RTree::Node **a_newNode,
+                                                                                           int a_level) {
+    int a=PickBranch(a_rect,a_node);
+    if (a_node->m_level>a_level){
+        InsertRect(a_rect,a_id,a_node,a_level);
+    }
+    if (a_node->m_level<a_level){
+        return false;
+    }
+    if (a_node->m_level>a_level){
+        AddBranch(&a_node->m_branch[a],a_node,a_newNode);
+        return true;
+    }
+    return false;
+}
+
+template<class DATATYPE, class ELEMTYPE, int NUMDIMS, class ELEMTYPEREAL, int TMAXNODES, int TMINNODES>
+bool RTree<DATATYPE, ELEMTYPE, NUMDIMS, ELEMTYPEREAL, TMAXNODES, TMINNODES>::InsertRect(RTree::Rect *a_rect,
+                                                                                        const DATATYPE &a_id,
+                                                                                        RTree::Node **a_root,
+                                                                                        int a_level) {
+    Node* newNode=(Node*)malloc(sizeof(Node));
+    Branch* branch=malloc(sizeof(Branch));
+    branch->m_data=a_id;
+    if(InsertRectRec(a_rect, a_id, *a_root, &newNode, a_level))  // 判断根节点是否被拆分
+    {
+        Node* newRoot = AllocNode();
+        newNode->m_level=(*a_root)->m_level+1;
+        branch->m_rect=NodeCover(*a_root);
+        branch->m_child = newNode; //将分裂出来的新的根节点加入到branch
+        AddBranch(&branch, newRoot, NULL);  //添加到新的根节点
+        *a_root = newRoot;   //该节点为新的根节点
+        return true;
+    }
+    return false;
+}
+/*int f(int x) 参数是一个int类型
+int f(int &x) 参数是一个int类型的引用
+区别的话，第一个当实参传过来被函数修改了，函数结束后实参还是传过来的实参
+第二个当实参传过来被函数修改了，函数结束后实参是修改后的的数*/
+template<class DATATYPE, class ELEMTYPE, int NUMDIMS, class ELEMTYPEREAL, int TMAXNODES, int TMINNODES>
+void RTree<DATATYPE, ELEMTYPE, NUMDIMS, ELEMTYPEREAL, TMAXNODES, TMINNODES>::Insert(const ELEMTYPE *a_min,
+                                                                                    const ELEMTYPE *a_max,
+                                                                                    const DATATYPE &a_dataId) {
+    Rect* rect=(Rect*)malloc(sizeof(Rect));
+    Node** a_root=AllocNode();
+    rect->m_max=*a_max;
+    rect->m_min=*a_min;
+    InsertRect(rect,a_dataId,a_root,0);
+}
+
 #endif //WY_CUDA_RTREE_H

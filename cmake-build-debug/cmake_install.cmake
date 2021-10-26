@@ -1,4 +1,4 @@
-# Install script for directory: /slef/cuda-wy
+# Install script for directory: /projects/提交中/cuda-wy
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -45,5 +45,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/slef/cuda-wy/cmake-build-debug/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/projects/提交中/cuda-wy/cmake-build-debug/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
