@@ -753,7 +753,11 @@ bool RTree<DATATYPE, ELEMTYPE, NUMDIMS, ELEMTYPEREAL, TMAXNODES, TMINNODES>::Ins
     int a=PickBranch(a_rect,a_node);
     if (a_node->m_level>a_level){
         if (InsertRectRec(a_rect,a_id,a_node,a_newNode,a_level)){
+            (a_node->m_branch)->rect= NodeCover(a_node);
             a_node=(a_node->m_branch[a])->m_child;
+            return AddBranch(branch,a_node,a_newNode);
+        } else{
+            CombineRect(a_rect,(a_node->m_branch)->rect);
             return AddBranch(branch,a_node,a_newNode);
         }
     }
