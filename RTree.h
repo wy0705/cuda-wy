@@ -749,18 +749,20 @@ bool RTree<DATATYPE, ELEMTYPE, NUMDIMS, ELEMTYPEREAL, TMAXNODES, TMINNODES>::Ins
                                                                                            RTree::Node *a_node,
                                                                                            RTree::Node **a_newNode,
                                                                                            int a_level) {
+    Branch* branch=malloc(sizeof(Branch));
     int a=PickBranch(a_rect,a_node);
     if (a_node->m_level>a_level){
-        InsertRect(a_rect,a_id,a_node,a_level);
+        if (InsertRectRec(a_rect,a_id,a_node,a_newNode,a_level)){
+            a_node=(a_node->m_branch[a])->m_child;
+            return AddBranch(branch,a_node,a_newNode);
+        }
     }
-    if (a_node->m_level<a_level){
-        return false;
+    if (a_node->m_level==a_level){
+        return AddBranch(branch,a_node,a_newNode);
     }
-    if (a_node->m_level>a_level){
-        AddBranch(&a_node->m_branch[a],a_node,a_newNode);
-        return true;
+    if (a_node->m_level==a_level){
+        exit(EXIT_FAILURE);
     }
-    return false;
 }
 
 template<class DATATYPE, class ELEMTYPE, int NUMDIMS, class ELEMTYPEREAL, int TMAXNODES, int TMINNODES>
