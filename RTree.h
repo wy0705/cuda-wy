@@ -803,5 +803,119 @@ void RTree<DATATYPE, ELEMTYPE, NUMDIMS, ELEMTYPEREAL, TMAXNODES, TMINNODES>::Ins
     rect->m_min=*a_min;
     InsertRect(rect,a_dataId,a_root,0);
 }
+template<class DATATYPE, class ELEMTYPE, int NUMDIMS, class ELEMTYPEREAL, int TMAXNODES, int TMINNODES>
+void RTree<DATATYPE, ELEMTYPE, NUMDIMS, ELEMTYPEREAL, TMAXNODES, TMINNODES>::Remove(const ELEMTYPE *a_min,
+                                                                                    const ELEMTYPE *a_max,
+                                                                                    const DATATYPE &a_dataId) {
+    //根据min和max声明一个rect
+    Rect *rect=new Rect;
+    rect->m_min=*a_min;
+    rect->m_max=*a_max;
+    //RemoveRect(&rect, a_dataId, &m_root); 把rect和dataid还有根节点传进去
+    RemoveRect(&rect,a_dataId,&m_root);
+}
+
+/*从索引结构中删除数据矩形。
+传入一个指向 Rect 的指针，记录的 tid，ptr 到 ptr 到根节点。
+如果没有找到记录，则返回 1，如果成功则返回 0。
+RemoveRect 用于消除根*/
+template<class DATATYPE, class ELEMTYPE, int NUMDIMS, class ELEMTYPEREAL, int TMAXNODES, int TMINNODES>
+bool RTree<DATATYPE, ELEMTYPE, NUMDIMS, ELEMTYPEREAL, TMAXNODES, TMINNODES>::RemoveRect(RTree::Rect *a_rect,
+                                                                                        const DATATYPE &a_id,
+                                                                                        RTree::Node **a_root) {
+    //声明一个临时节点 Node* tempNode;
+    Node *tempNode=new Node;
+    //声明一个节点链表，记录的是因为拆分节点之后，发生下溢，需要重新加入到树的节点 ListNode* reInsertList=NULL;
+    ListNode* reInsertList=NULL;
+
+    if(!RemoveRectRec(a_rect, a_id, *a_root, &reInsertList))   // 找到并删除了一个数据项,RemoveRectRec返回false则是删除成功
+    {
+        // 重新插入已消除节点的任何分支
+        while(reInsertList)
+        {
+            tempNode = reInsertList->m_node;
+
+            for(int index = 0; index < tempNode->m_count; ++index)
+            {
+                InsertRect(&(tempNode->m_branch[index].m_rect),   //这个方法是刘庆成实现的，从索引结构中添加数据矩形，你可以随便用
+                           tempNode->m_branch[index].m_data,
+                           a_root,
+                           tempNode->m_level);
+            }
+            //链表指向下一个
+            ListNode* remLNode = reInsertList;
+            reInsertList = reInsertList->m_next;
+            //当前插入过得节点可以释放了
+            FreeNode(remLNode->m_node);
+            FreeListNode(remLNode);
+        }
+
+        // 检查多余的根（不是叶子且只有一个孩子）并消除
+        if((*a_root)->m_count == 1 && (*a_root)->IsInternalNode())
+        {
+            tempNode = (*a_root)->m_branch[0].m_child;
+            FreeNode(*a_root);
+            //删除多余的根节点之后，根节点也要发生改变
+            *a_root = tempNode;
+        }
+        return false;
+    }
+    else
+    {
+        return true;
+    }
+    return false;
+}
+
+/* 从索引结构的非根部分删除一个矩形。
+ 由 RemoveRect 调用。 递归下降树，
+ 在返回的路上合并分支。
+ 如果没有找到记录，则返回 1，如果成功则返回 0。*/
+//通俗来讲，只有被成功删除了数据项，才会返回false，否则都是true
+template<class DATATYPE, class ELEMTYPE, int NUMDIMS, class ELEMTYPEREAL, int TMAXNODES, int TMINNODES>
+bool RTree<DATATYPE, ELEMTYPE, NUMDIMS, ELEMTYPEREAL, TMAXNODES, TMINNODES>::RemoveRectRec(RTree::Rect *a_rect,//要删除的
+                                                                                           const DATATYPE &a_id,
+                                                                                           RTree::Node *a_node,//当前节点
+                                                                                           RTree::ListNode **a_listNode) {
+
+    if(a_node->IsInternalNode())   //不是叶子节点
+    {
+        //遍历当前节点中branch的rect
+        for(int index = 0; index < a_node->m_count; ++index)
+        {
+            Rect* a_rectA=a_rect;
+            Rect* a_rectB=a_node->m_branch[MAXNODES]->m_rect;
+            //判断遍历的rect是否与我们的目标a_rect有重叠部分，用Overlap方法来看是否有重叠部分
+            if (Overlap(*a_rectA, *a_rectB) == true){
+                //如果有重叠部分，下一步递归判断这个子节点RemoveRectRec是否为false，如果是false，说明成功删除了一个数据项
+                if(RemoveRectRec(*a_rect,&a_id,*a_node,**a_listNode) == false){
+                    //删除数据项之后，判断是否发生了下溢
+                    if (a_node->m_count>MAXNODES/2){
+                        //没有发生下溢， 因为删除了孩子，所以只需调整父矩形的大小，用NodeCover方法来调整矩阵大小
+                        NodeCover(a_node);
+                    }
+                    else{
+                        //发生下溢， 因为孩子被移除，且节点中没有足够的条目，所以消除节点,用ReInsert方法，先将该节点中branch的孩子加到a_listNode链表
+                        ReInsert(a_rect,a_listNode);
+                        // (该节点就放的就是需要重新加载到索引结构中的节点)中，然后用DisconnectBranch方法把该节点从branch中去除掉
+                        DisconnectBranch(a_rect,a_id);
+                    }
+                }
+            }
+        }
+    }
+    else     //是叶子节点
+    {
+        //遍历叶子节点中branch的孩子
+        for(int index = 0; index < a_node->m_count; ++index){
+            Node *child=a_node->m_branch[MAXNODES]->m_child;
+            //如果孩子节点与目标a_id比较相等（注意把a_id强转成Node*的形式再做比较），则调用DisconnectBranch方法把该节点从branch中去除掉
+            if (*child==(Node*)a_id){
+                DisconnectBranch(child,a_id);
+            }
+        }
+    }
+    return false;
+}
 
 #endif //WY_CUDA_RTREE_H
