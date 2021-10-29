@@ -918,4 +918,177 @@ bool RTree<DATATYPE, ELEMTYPE, NUMDIMS, ELEMTYPEREAL, TMAXNODES, TMINNODES>::Rem
     return false;
 }
 
+
+
+//刘庆成
+/*RTREE_TEMPLATE
+void RTREE_QUAL::Insert(const ELEMTYPE a_min[NUMDIMS], const ELEMTYPE a_max[NUMDIMS], const DATATYPE& a_dataId)
+{
+    Rect rect;
+    for (int axis = 0; axis < NUMDIMS; ++axis) {
+        rect.m_min[axis]=a_min[axis];
+        rect.m_max[axis]=a_max[axis];
+    }
+    InsertRect(&rect,a_dataId,&m_root,0);
+}
+
+RTREE_TEMPLATE
+bool RTREE_QUAL::InsertRect(Rect* a_rect, const DATATYPE& a_id, Node** a_root, int a_level)
+{
+    Node* newRoot;
+    Node* newNode;
+    Branch branch;
+
+    if(InsertRectRec(a_rect, a_id, *a_root, &newNode, a_level))  // Root split
+    {
+        newRoot = AllocNode();  // Grow tree taller and new root
+        newRoot->m_level = (*a_root)->m_level + 1;
+        branch.m_rect = NodeCover(*a_root);
+        branch.m_child = *a_root;
+        AddBranch(&branch, newRoot, NULL);
+        branch.m_rect = NodeCover(newNode);
+        branch.m_child = newNode;
+        AddBranch(&branch, newRoot, NULL);
+        *a_root = newRoot;
+        return true;
+    }
+
+    return false;
+}
+RTREE_TEMPLATE
+bool RTREE_QUAL::InsertRectRec(Rect* a_rect, const DATATYPE& a_id, Node* a_node, Node** a_newNode, int a_level)
+{
+    int index;
+    Branch branch;
+    Node* otherNode;
+
+    // 仍然高于插入级别，递归下树
+    if(a_node->m_level > a_level)
+    {
+        index = PickBranch(a_rect, a_node);
+        if (!InsertRectRec(a_rect, a_id, a_node->m_branch[index].m_child, &otherNode, a_level))
+        {
+            // Child was not split
+            a_node->m_branch[index].m_rect = CombineRect(a_rect, &(a_node->m_branch[index].m_rect));
+            return false;
+        }
+        else // Child was split
+        {
+            a_node->m_branch[index].m_rect = NodeCover(a_node->m_branch[index].m_child);
+            branch.m_child = otherNode;
+            branch.m_rect = NodeCover(otherNode);
+            return AddBranch(&branch, a_node, a_newNode);
+        }
+    }
+    else if(a_node->m_level == a_level)
+    {
+        branch.m_rect = *a_rect;
+        branch.m_child = (Node*) a_id;
+        return AddBranch(&branch, a_node, a_newNode);
+    }
+    else
+    {
+        return false;
+    }
+}*/
+
+//王谷予
+/*RTREE_TEMPLATE
+void RTREE_QUAL::Remove(const ELEMTYPE a_min[NUMDIMS], const ELEMTYPE a_max[NUMDIMS], const DATATYPE& a_dataId)
+{
+    Rect rect;
+
+    for(int axis=0; axis<NUMDIMS; ++axis)
+    {
+        rect.m_min[axis] = a_min[axis];
+        rect.m_max[axis] = a_max[axis];
+    }
+
+    RemoveRect(&rect, a_dataId, &m_root);
+}
+RTREE_TEMPLATE
+bool RTREE_QUAL::RemoveRect(Rect* a_rect, const DATATYPE& a_id, Node** a_root)
+{
+
+    Node* tempNode;
+    ListNode* reInsertList = NULL;
+
+    if(!RemoveRectRec(a_rect, a_id, *a_root, &reInsertList))
+    {
+        // 找到并删除了一个数据项
+        // 重新插入已消除节点的任何分支
+        while(reInsertList)
+        {
+            tempNode = reInsertList->m_node;
+
+            for(int index = 0; index < tempNode->m_count; ++index)
+            {
+                InsertRect(&(tempNode->m_branch[index].m_rect),
+                           tempNode->m_branch[index].m_data,
+                           a_root,
+                           tempNode->m_level);
+            }
+
+            ListNode* remLNode = reInsertList;
+            reInsertList = reInsertList->m_next;
+
+            FreeNode(remLNode->m_node);
+            FreeListNode(remLNode);
+        }
+
+        if((*a_root)->m_count == 1 && (*a_root)->IsInternalNode())
+        {
+            tempNode = (*a_root)->m_branch[0].m_child;
+
+            FreeNode(*a_root);
+            *a_root = tempNode;
+        }
+        return false;
+    }
+    else
+    {
+        return true;
+    }
+}
+RTREE_TEMPLATE
+bool RTREE_QUAL::RemoveRectRec(Rect* a_rect, const DATATYPE& a_id, Node* a_node, ListNode** a_listNode)
+{
+    if(a_node->IsInternalNode())
+    {
+        for(int index = 0; index < a_node->m_count; ++index)
+        {
+            if(Overlap(a_rect, &(a_node->m_branch[index].m_rect)))
+            {
+                if(!RemoveRectRec(a_rect, a_id, a_node->m_branch[index].m_child, a_listNode))
+                {
+                    if(a_node->m_branch[index].m_child->m_count >= MINNODES)
+                    {
+                        // 删除了孩子，只需调整父矩形的大小
+                        a_node->m_branch[index].m_rect = NodeCover(a_node->m_branch[index].m_child);
+                    }
+                    else
+                    {
+                        // 孩子被移除，节点中没有足够的条目，消除节点
+                        ReInsert(a_node->m_branch[index].m_child, a_listNode);
+                        DisconnectBranch(a_node, index); //由于计数已更改，因此必须在此调用后返回
+                    }
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    else
+    {
+        for(int index = 0; index < a_node->m_count; ++index)
+        {
+            if(a_node->m_branch[index].m_child == (Node*)a_id)
+            {
+                DisconnectBranch(a_node, index);
+                return false;
+            }
+        }
+        return true;
+    }
+}*/
 #endif //WY_CUDA_RTREE_H
